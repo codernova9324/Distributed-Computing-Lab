@@ -7,60 +7,49 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.Scanner;
 
-public class Server {
-    public static void main(String[] args){
-        final ServerSocket serverSocket ;
-        final Socket clientSocket ;
-        final BufferedReader in;
-        final PrintWriter out;
-        final Scanner sc=new Scanner(System.in);
+public class server {
+    public static void main(String[] args) {
+        try (ServerSocket serverSocket = new ServerSocket(5000);
+             Socket clientSocket = serverSocket.accept();
+             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
 
-        try {
-            serverSocket = new ServerSocket(5000);
-            clientSocket = serverSocket.accept();
-            out = new PrintWriter(clientSocket.getOutputStream());
-            in = new BufferedReader (new InputStreamReader(clientSocket.getInputStream()));
+            Scanner sc = new Scanner(System.in);
 
-            Thread sender= new Thread(new Runnable() {
-                String msg; //variable that will contains the data writter by the user
-                @Override   // annotation to override the run method
-                public void run() {
-                    while(true){
-                        msg = sc.nextLine(); //reads data from user's keybord
-                        out.println(msg);    // write data stored in msg in the clientSocket
-                        out.flush();   // forces the sending of the data
+            // Thread for sending messages
+            Thread sender = new Thread(() -> {
+                try {
+                    while (true) {
+                        String msg = sc.nextLine();
+                        if (msg.equalsIgnoreCase("exit")) break; // Exit on typing "exit"
+                        out.println(msg);
                     }
-                }
-        });
-            sender.start();
-
-            Thread receive= new Thread(new Runnable() {
-                String msg ;
-                @Override
-                public void run() {
-                    try {
-                        msg = in.readLine();
-                        //tant que le client est connecté
-                        while(msg!=null){
-                            System.out.println("Client : "+msg);
-                            msg = in.readLine();
-                        }
-
-                        System.out.println("Client déconecté");
-
-                        out.close();
-                        clientSocket.close();
-                        serverSocket.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                } finally {
+                    sc.close(); // Close scanner when done
                 }
             });
-            receive.start();
-        } catch (IOException e) {
+            sender.start();
+
+            // Thread for receiving messages
+            Thread receiver = new Thread(() -> {
+                try {
+                    String msg;
+                    while ((msg = in.readLine()) != null) {
+                        System.out.println("Client: " + msg);
+                    }
+                    System.out.println("Client disconnected");
+                } catch (IOException e) {
+                    System.out.println("Error reading from client: " + e.getMessage());
+                }
+            });
+            receiver.start();
+
+            // Wait for sender to finish
+            sender.join();
+
+        } catch (IOException | InterruptedException e) {
+            System.out.println("Server exception: " + e.getMessage());
             e.printStackTrace();
         }
-
-
     }
 }

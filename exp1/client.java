@@ -6,49 +6,48 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Scanner;
 
-public class Client {
-    public static void main(String[] args){
-        final Socket clientSocket; // socket used by client to send and recieve data from server
-        final BufferedReader in;   // object to read data from socket
-        final PrintWriter out;     // object to write data into socket
-        final Scanner sc = new Scanner(System.in); // object to read data from user's keybord
-        try {
-            clientSocket = new Socket("127.0.0.1",5000);
-            out = new PrintWriter(clientSocket.getOutputStream());
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            Thread sender = new Thread(new Runnable() {
-                String msg;
-                @Override
-                public void run() {
-                    while(true){
-                        msg = sc.nextLine();
+public class client {
+    public static void main(String[] args) {
+        try (Socket clientSocket = new Socket("127.0.0.1", 5000);
+             PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true);
+             BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()))) {
+
+            Scanner sc = new Scanner(System.in);
+
+            // Thread for sending messages
+            Thread sender = new Thread(() -> {
+                try {
+                    while (true) {
+                        String msg = sc.nextLine();
+                        if (msg.equalsIgnoreCase("exit")) break; // Exit on typing "exit"
                         out.println(msg);
-                        out.flush();
                     }
+                } finally {
+                    sc.close(); // Close scanner when done
                 }
             });
             sender.start();
-            Thread receiver = new Thread(new Runnable() {
-                String msg;
-                @Override
-                public void run() {
-                    try {
-                        msg = in.readLine();
-                        while(msg!=null){
-                            System.out.println("Server : "+msg);
-                            msg = in.readLine();
-                        }
-                        System.out.println("Server out of service");
-                        out.close();
-                        clientSocket.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
+
+            // Thread for receiving messages
+            Thread receiver = new Thread(() -> {
+                try {
+                    String msg;
+                    while ((msg = in.readLine()) != null) {
+                        System.out.println("Server: " + msg);
                     }
+                    System.out.println("Server disconnected");
+                } catch (IOException e) {
+                    System.out.println("Error reading from server: " + e.getMessage());
                 }
             });
-            receiver .start();
-    }catch (IOException e){
-        e.printStackTrace();
+            receiver.start();
+
+            // Wait for sender to finish
+            sender.join();
+
+        } catch (IOException | InterruptedException e) {
+            System.out.println("Client exception: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }
